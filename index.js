@@ -1,6 +1,29 @@
 const express = require('express')
+const morgan = require('morgan');
+const cors = require('cors')
 const app = express()
 app.use(express.json())
+
+app.use(cors())
+
+
+//exercise 3.8
+app.use(morgan(function (tokens, req, res) {
+
+  return [
+     tokens.method(req, res),
+     tokens.url(req, res),
+     tokens.status(req, res),
+     tokens.res(req, res, 'content-length'), '-',
+     tokens['response-time'](req, res), 'ms',
+    JSON.stringify(req.body)
+  ].join(' ')
+}))
+//las lineas de abajo son el equivalente a la funcion que tenemos arriba
+
+// morgan.token('body', (req, res) => JSON.stringify(req.body));
+// app.use(morgan(':method :url :status :response-time ms - :res[content-length] :body - :req[content-length]'));
+
 
 let persons = [
     { 
