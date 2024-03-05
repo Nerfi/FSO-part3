@@ -26,18 +26,66 @@ let persons = [
 ];
 
 
-app.get('/api/persons', (request, response) => {
-    response.send(persons);
-  })
+app.get("/api/persons", (request, response) => {
+  response.send(persons);
+});
 
-  app.get("/info", (request, response )=> {
-    const personsLength = persons.length;
-    
-    const addedTime =new Date();
-   
-    response.send(`Phoneboook has indo for ${personsLength} <br> ${addedTime}`)
-  })
+app.get("/api/persons/:id", (request, response) => {
+  // si no hay entrada 404
+  const idSend = Number(request.params.id);
+  const user = persons.find((p) => p.id === idSend);
 
+  if (user) {
+    response.send(user);
+  } else {
+    response.status(404).end();
+  }
+  
+});
+
+app.get("/info", (request, response) => {
+  const personsLength = persons.length;
+
+  const addedTime = new Date();
+
+  response.send(`Phoneboook has indo for ${personsLength} <br> ${addedTime}`);
+});
+
+app.delete("/api/persons/:id", (request, response) => {
+  const idSend = Number(request.params.id);
+  const deleteUser = persons.filter((p) => p.id !== idSend);
+  response.status(204).end();
+});
+
+
+app.post("/api/persons", (request, response) => {
+  const randomId = Math.floor(Math.random() * 100);
+  const body = request.body;
+
+  const personsNames = persons.map((p) => p.name.toLowerCase());
+
+  if (personsNames.includes(body.name)) {
+    response.status(400).json({
+      error: "name must be unique",
+    });
+  }
+
+  if (!body.name || !body.number) {
+    response.status(400).json({
+      error: "content missing",
+    });
+  }
+
+  const newPerson = {
+    id: randomId,
+    name: body.name,
+    number: body.number,
+  };
+
+  persons = persons.concat(newPerson);
+  //devolvemos el recurso si todo ha salido bien
+  response.json(newPerson);
+});
 
 
 
