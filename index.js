@@ -1,101 +1,98 @@
-const express = require('express')
-const morgan = require('morgan');
-const cors = require('cors')
-const app = express()
-app.use(express.json())
+require("dotenv").config();
+const express = require("express");
+const morgan = require("morgan");
+const cors = require("cors");
+const PhoneBook = require("./models/phoneBook");
 
-app.use(cors())
+const app = express();
+
+app.use(express.json());
+
+app.use(cors());
 
 //Para hacer que express muestre contenido estático, la página index.html y el JavaScript, etc., necesitamos un middleware integrado de express llamado static.
-app.use(express.static('dist'))
-
-
+app.use(express.static("dist"));
 
 //exercise 3.8
-app.use(morgan(function (tokens, req, res) {
-
-  return [
-     tokens.method(req, res),
-     tokens.url(req, res),
-     tokens.status(req, res),
-     tokens.res(req, res, 'content-length'), '-',
-     tokens['response-time'](req, res), 'ms',
-    JSON.stringify(req.body)
-  ].join(' ')
-}))
+app.use(
+  morgan(function (tokens, req, res) {
+    return [
+      tokens.method(req, res),
+      tokens.url(req, res),
+      tokens.status(req, res),
+      tokens.res(req, res, "content-length"),
+      "-",
+      tokens["response-time"](req, res),
+      "ms",
+      JSON.stringify(req.body),
+    ].join(" ");
+  })
+);
 //las lineas de abajo son el equivalente a la funcion que tenemos arriba
 
 // morgan.token('body', (req, res) => JSON.stringify(req.body));
 // app.use(morgan(':method :url :status :response-time ms - :res[content-length] :body - :req[content-length]'));
 
+//error handler middleware
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
 
-let persons = [
-    { 
-      "id": 1,
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": 2,
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": 3,
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": 4,
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-];
-
-
-app.get("/api/persons", (request, response) => {
-  response.send(persons);
-});
-
-app.get("/api/persons/:id", (request, response) => {
-  // si no hay entrada 404
-  const idSend = Number(request.params.id);
-  const user = persons.find((p) => p.id === idSend);
-
-  if (user) {
-    response.send(user);
-  } else {
-    response.status(404).end();
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformatted id loco" });
   }
-  
+  //esta linea next(error) esta ahi ya que si el nombre del error no es CastError lo que hara sera pasarle el error
+  //al middleware que tiene express por defecto
+  next(error);
+};
+
+app.get("/api/persons", (request, response, next) => {
+  PhoneBook.find({})
+    .then((notes) => {
+      response.json(notes);
+    })
+    .catch((err) => next(err));
 });
 
-app.get("/info", (request, response) => {
-  const personsLength = persons.length;
+app.get("/api/persons/:id", (request, response, next) => {
+  // si no hay entrada 404
+  const idSend = request.params.id;
 
-  const addedTime = new Date();
+  PhoneBook.findById(idSend)
+    .then((person) => {
+      if (person) {
+        response.json(person);
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+      next(err);
+      //response.status(400).send({ error: 'malformatted id' })
+    });
+});
 
-  response.send(`Phoneboook has indo for ${personsLength} <br> ${addedTime}`);
+app.get("/info", (request, response, next) => {
+  PhoneBook.find({})
+    .then((notes) => {
+      response.send(`Phoneboook has info for ${notes.length} <br>  `);
+    })
+    .catch((err) => next(err));
 });
 
 app.delete("/api/persons/:id", (request, response) => {
-  const idSend = Number(request.params.id);
-  const deleteUser = persons.filter((p) => p.id !== idSend);
-  response.status(204).end();
+  try {
+    PhoneBook.findByIdAndDelete(request.params.id).then((res) => {
+      response.status(204).end();
+    });
+  } catch (error) {
+    next(error);
+    console.log(error);
+  }
 });
 
-
 app.post("/api/persons", (request, response) => {
-  const randomId = Math.floor(Math.random() * 100);
   const body = request.body;
-
-  const personsNames = persons.map((p) => p.name.toLowerCase());
-
-  if (personsNames.includes(body.name)) {
-    response.status(400).json({
-      error: "name must be unique",
-    });
-  }
 
   if (!body.name || !body.number) {
     response.status(400).json({
@@ -103,20 +100,40 @@ app.post("/api/persons", (request, response) => {
     });
   }
 
-  const newPerson = {
-    id: randomId,
+  const newPerson = new PhoneBook({
+    name: body.name,
+    number: body.number,
+    addedTime: new Date().toISOString(),
+  });
+
+  newPerson
+    .save()
+    .then((res) => {
+      response.json(res);
+    })
+    .catch((err) => console.log(err));
+});
+
+app.put("/api/persons/:id", (request, response, next) => {
+  const body = request.body;
+
+  const updatedPerson = {
     name: body.name,
     number: body.number,
   };
 
-  persons = persons.concat(newPerson);
-  //devolvemos el recurso si todo ha salido bien
-  response.json(newPerson);
+  //update
+
+  PhoneBook.findByIdAndUpdate(request.params.id, updatedPerson, { new: true })
+    .then((updated) => {
+      response.json(updated);
+    })
+    .catch((err) => next(err));
 });
 
+app.use(errorHandler);
 
-
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});
