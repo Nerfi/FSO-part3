@@ -35,11 +35,19 @@ app.use(
 
 //error handler middleware
 const errorHandler = (error, request, response, next) => {
-  console.error(error.message);
+
 
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id loco" });
+  }  else if (error.name === 'ValidationError') {
+    console.log(error)
+  
+  
+    return response.status(400).json({ error: error.message })
   }
+
+
+ 
   //esta linea next(error) esta ahi ya que si el nombre del error no es CastError lo que hara sera pasarle el error
   //al middleware que tiene express por defecto
   next(error);
@@ -91,14 +99,14 @@ app.delete("/api/persons/:id", (request, response) => {
   }
 });
 
-app.post("/api/persons", (request, response) => {
+app.post("/api/persons", (request, response, next) => {
   const body = request.body;
 
-  if (!body.name || !body.number) {
-    response.status(400).json({
-      error: "content missing",
-    });
-  }
+  // if (!body.name || !body.number) {
+  //   response.status(400).json({
+  //     error: "content missing",
+  //   });
+  // }
 
   const newPerson = new PhoneBook({
     name: body.name,
@@ -111,20 +119,20 @@ app.post("/api/persons", (request, response) => {
     .then((res) => {
       response.json(res);
     })
-    .catch((err) => console.log(err));
+    .catch((err) => next(err));
 });
 
 app.put("/api/persons/:id", (request, response, next) => {
-  const body = request.body;
+  const {name, number} = request.body;
 
   const updatedPerson = {
-    name: body.name,
-    number: body.number,
+    name: name,
+    number: number,
   };
 
   //update
 
-  PhoneBook.findByIdAndUpdate(request.params.id, updatedPerson, { new: true })
+  PhoneBook.findByIdAndUpdate(request.params.id, updatedPerson,  { new: true, runValidators: true, context: 'query' } )
     .then((updated) => {
       response.json(updated);
     })
